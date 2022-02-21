@@ -1,15 +1,11 @@
-import { useCallback, useLayoutEffect, useState } from "react"
-import { useEffect } from "react"
 import { useRef } from "react"
-import { useVirtual } from "react-virtual"
-import { useDebounce } from "usehooks-ts"
-
-const ROW_HEIGHT = 30
+import useVirtualData from "./useVirtualData"
 
 const cellStyle = {
   display: 'flex',
   padding: '2px 5px',
   alignItems: 'center',
+  outline: '1px solid black',
 }
 
 interface Column {
@@ -19,61 +15,70 @@ interface Column {
 }
 
 interface GridTableParams {
-  name: string,
   columns: Column[],
   data: any[],
+  rowHeight?: Number,
+  cellGap?: Number,
+  before?: Number,
+  after?: Number,
 }
 
 export default function GridTable({
-  name,
   columns,
+  rowHeight = 30,
+  cellGap = 1,
+  before = 0,
+  after = 0,
   data,
 }: GridTableParams) {
 
-  const dataWithIndexes = data.map((datum, index) => ({ ...datum, index }))
+  // const dataWithIndexes = data.map((datum, index) => ({ ...datum, index }))
 
   const gridTemplateColumns = columns.map(column => column.width ?? 'min-content').join(' ')
 
-  const viewWindowRef = useRef()
-  const gridTableBodyRef = useRef()
+  const parentRef = useRef()
 
-  // const { virtualItems, totalSize } = useVirtual({
-  //   size: data.length,
-  //   gridTableBodyRef,
-  //   estimateSize: useCallback(() => ROW_HEIGHT, []),
-  //   overscan: 5,
-  // })
+  // // https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollTop:
+  // // An element's scrollTop value is a measurement of the distance 
+  // // from the element's top to its topmost visible content. 
+  // // When an element's content does not generate a vertical scrollbar, 
+  // // then its scrollTop value is 0.
+  // const [scrollTop, setScrollTop] = useState(0)
+  // useEffect(() => {
+  //   console.log('setting parent scroll handler')
+  //   const handleParentScroll = () => setScrollTop(parentRef.current?.scrollTop)
+  //   parentRef.current?.addEventListener('scroll', handleParentScroll)
+  //   return () => parentRef.current?.removeEventListener('scroll', handleParentScroll)
+  // }, [parentRef.current])
 
-  const [numChildren, setNumChildren] = useState(0)
-  useEffect(
-    () => setNumChildren(gridTableBodyRef.current?.children?.length),
-    []
-  )
+  // // The number of rows that should be displayed is equal to the height 
+  // // of the container divided by the row height.
+  // const [containerHeight, setContainerHeight] = useState(0)
+  // const handleWindowResize = () => setContainerHeight(parentRef.current?.clientHeight)
+  // useEffect(handleWindowResize, [])
+  // useEffect(() => {
+  //   window.addEventListener('resize', handleWindowResize)
+  //   return () => window.removeEventListener('resize', handleWindowResize)
+  // }, [])
 
-  // https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollTop:
-  // An element's scrollTop value is a measurement of the distance 
-  // from the element's top to its topmost visible content. 
-  // When an element's content does not generate a vertical scrollbar, 
-  // then its scrollTop value is 0.
-  const [scrollTop, setScrollTop] = useState(0)
+  // const numRowsToDisplay = Math.ceil(containerHeight / ROW_HEIGHT)
 
-  // The number of rows that should be displayed is equal to the height 
-  // of the container divided by the row height.
-  const [containerHeight, setContainerHeight] = useState(0)
-  const handler = () => setContainerHeight(viewWindowRef.current?.clientHeight)
-  useEffect(handler, [])
-  useEffect(() => {
-    window.addEventListener('resize', handler)
-    return () => window.removeEventListener('resize', handler)
-  }, [])
+  // const numRows = data.length
 
-  const numRowsToDisplay = Math.ceil(containerHeight / ROW_HEIGHT)
+  // // The first row to display is the container's scrollTop divided by the row height:
+  // const firstRowIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - before)
+  // const lastRowIndex = Math.min(firstRowIndex + before + numRowsToDisplay + after, numRows)
 
-  // The first row to display is the container's scrollTop divided by the row height:
-  const firstRowIndex = Math.floor(scrollTop / ROW_HEIGHT)
-  const lastRowIndex = firstRowIndex + numRowsToDisplay
+  // const dataToRender = dataWithIndexes.slice(firstRowIndex, lastRowIndex)
 
-  const dataToRender = dataWithIndexes.slice(firstRowIndex, lastRowIndex)
+  const { virtualData, gridTemplateRows } = useVirtualData({
+    data,
+    rowHeight,
+    cellGap,
+    parentRef,
+    before,
+    after,
+  })
 
   return (
     <div style={{
@@ -94,18 +99,16 @@ export default function GridTable({
           overflowY: 'auto',
           position: 'relative',
         }}
-        ref={viewWindowRef}
-        onScroll={() => setScrollTop(viewWindowRef.current?.scrollTop)}
+        ref={parentRef}
       >
 
         <div
           id="grid-table-body"
-          ref={gridTableBodyRef}
           style={{
             display: 'grid',
             gridTemplateColumns,
-            gridTemplateRows: `repeat(${data.length}, ${ROW_HEIGHT}px)`,
-            // height: totalSize,
+            gridTemplateRows,
+            gap: cellGap,
           }}>
 
           {/* header cells */}
@@ -123,7 +126,7 @@ export default function GridTable({
           )}
 
           {/* body cells */}
-          {dataToRender.map(
+          {virtualData.map(
             datum => {
               // let datum = data[virtualItem.index]
 
@@ -155,14 +158,13 @@ export default function GridTable({
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '2rem', }}>
-        <span>{numChildren} child elements</span>
+      {/* <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: '2rem', }}>
         <span>scrollTop: {scrollTop}</span>
         <span>containerHeight: {containerHeight}</span>
         <span>numRowsToDisplay: {numRowsToDisplay}</span>
         <span>firstRowIndex: {firstRowIndex}</span>
         <span>lastRowIndex: {lastRowIndex}</span>
-      </div>
+      </div> */}
     </div>
   )
 }
